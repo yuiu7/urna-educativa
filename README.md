@@ -8,6 +8,8 @@ A proposta é ser simples e acessível: não precisa instalar programas ou ter c
 
 O código foi desenvolvido com assistência de IA (ferramenta Claude Pro) para uso pessoal em uma atividade pedagógica com crianças e adultos. Está disponibilizado abertamente para que outras pessoas possam utilizar para os mesmos fins.
 
+[Confira aqui um modelo da urna em funcionamento](https://yuiu7.github.io/)
+
 **Atenção:** Não recomendamos o uso desta urna para eleições reais ou votações oficiais. O projeto não foi desenvolvido para garantir segurança, sigilo ou integridade dos votos.
 
 ## Funcionalidades:
