@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Urna Eletrônica — Simulador</title>
+<style>
+:root{
+  --body:#e4e1d8; --body-edge:#c9c5b9; --bezel:#2a2b2d; --lcd:#f3f4ee; --ink:#141414;
+  --key:#1c1d1f; --key-top:#34363a; --branco:#f7f7f4; --corrige:#e8741c; --confirma:#1f9d48;
+  --page:#b9c3c9; --label:#44474c; --paper:#fffef9; --accent:#1c4f8a;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --page:#1b2024; --label:#b6bcc2; }
+}
+:root[data-theme="dark"]{ --page:#1b2024; --label:#b6bcc2; }
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0;min-height:100%;background:var(--page);color:var(--ink);
+  font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;
+  display:flex;flex-direction:column;align-items:center;
+  -webkit-tap-highlight-color:transparent;
+}
+.topbar{width:100%;max-width:980px;display:flex;justify-content:space-between;align-items:center;padding:12px 16px 6px;color:var(--label);font-size:14px}
+.topbar strong{font-size:15px}
+.mesario-btn{background:none;border:1px solid currentColor;color:var(--label);border-radius:6px;padding:6px 12px;font:inherit;cursor:pointer}
+.urna{
+  width:min(960px,calc(100% - 20px));
+  background:linear-gradient(180deg,#ecEAE2,var(--body));
+  border:1px solid var(--body-edge);
+  border-radius:18px 18px 10px 10px;
+  box-shadow:0 2px 0 #fff inset,0 18px 30px rgba(0,0,0,.25),0 4px 0 var(--body-edge);
+  padding:18px;display:grid;grid-template-columns:1.55fr 1fr;gap:18px;margin-bottom:16px;
+}
+.screen-wrap{align-self:start;background:var(--bezel);border-radius:10px;padding:14px;box-shadow:inset 0 2px 6px rgba(0,0,0,.6)}
+.screen{
+  background:var(--lcd);border-radius:3px;aspect-ratio:4/3;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;padding:4% 4.5% 0;container-type:inline-size;
+}
+.panel{background:#d8d5cb;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 1px 3px rgba(0,0,0,.2)}
+.brand{display:flex;align-items:center;gap:10px;color:#3a3b3d;font-size:12px;line-height:1.25}
+.brand .seal{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#3f73b3,#173c6a);flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px}
+.brand b{display:block;font-size:14px;letter-spacing:.02em}
+.keypad{background:#151618;border-radius:8px;padding:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.key{
+  appearance:none;border:0;border-radius:6px;cursor:pointer;
+  background:linear-gradient(180deg,var(--key-top),var(--key));
+  color:#fff;font:700 clamp(20px,3.2vw,28px)/1 Arial,sans-serif;
+  padding:0;aspect-ratio:1.5/1;position:relative;
+  box-shadow:0 3px 0 #000,0 4px 6px rgba(0,0,0,.4);
+  transition:transform .05s,box-shadow .05s;touch-action:manipulation;
+}
+.key:active,.key.pressed{transform:translateY(3px);box-shadow:0 0 0 #000}
+.key.zero{grid-column:2}
+.key.five::after{content:"";position:absolute;left:50%;bottom:18%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:#8b8e93}
+.actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px}
+.act{
+  appearance:none;border:0;border-radius:5px;cursor:pointer;
+  font:700 clamp(11px,1.5vw,14px)/1 Arial,sans-serif;letter-spacing:.02em;
+  padding:16px 2px;box-shadow:0 3px 0 rgba(0,0,0,.45);touch-action:manipulation;
+  transition:transform .05s,box-shadow .05s;
+}
+.act:active,.act.pressed{transform:translateY(3px);box-shadow:none}
+.act.b{background:var(--branco);color:#111}
+.act.c{background:var(--corrige);color:#111}
+.act.ok{background:var(--confirma);color:#111;padding-top:22px;padding-bottom:22px;align-self:end}
+.key:focus-visible,.act:focus-visible,.mesario-btn:focus-visible,button:focus-visible{outline:3px solid #ffd23a;outline-offset:2px}
+.s-top{font-size:3.6cqw;font-weight:700}
+.s-cargo{font-size:6.2cqw;text-align:center;margin:3.5cqw 0 3cqw;font-weight:400}
+.s-body{display:flex;justify-content:space-between;gap:3cqw;flex:1}
+.s-left{flex:1;font-size:4.2cqw;display:flex;flex-direction:column;gap:2.4cqw}
+.digits{display:inline-flex;gap:1.6cqw;vertical-align:middle;margin-left:2cqw}
+.digit{width:7.5cqw;height:9.5cqw;border:.35cqw solid #000;display:grid;place-items:center;font-size:7cqw;font-weight:400;background:#fff}
+.digit.cur{animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{background:#000}}
+.photo{width:24cqw;text-align:center;font-size:3cqw}
+.photo img{width:100%;aspect-ratio:3/4;object-fit:cover;object-position:50% 15%;filter:grayscale(1);border:.3cqw solid #555;display:block}
+.big{font-size:7.5cqw;font-weight:700;text-align:center;margin-top:4cqw;animation:blinkTxt 1.2s steps(1) infinite}
+.medium{font-size:4.6cqw;font-weight:700;margin-top:2cqw}
+@keyframes blinkTxt{50%{opacity:.15}}
+.s-foot{border-top:.35cqw solid #000;margin:0 -5% ;padding:2cqw 4.5% 2.6cqw;font-size:3.3cqw;line-height:1.35}
+.s-center{flex:1;display:grid;place-items:center;text-align:center}
+.fim{font-size:22cqw;font-weight:700;letter-spacing:.02em}
+.wait{font-size:5cqw;font-weight:700;line-height:1.3}
+.wait small{display:block;font-size:3.4cqw;font-weight:400;margin-top:2cqw}
+.progress{position:absolute;left:0;bottom:0;height:1.2cqw;background:#1f9d48;width:0}
+.progress.run{animation:fill 2.6s linear forwards}
+@keyframes fill{to{width:100%}}
+.help{width:min(960px,calc(100% - 20px));color:var(--label);font-size:14px;line-height:1.5;margin:0 0 20px;padding:0 4px}
+.help p{margin:0 0 6px;max-width:72ch}
+.modal{position:fixed;inset:0;background:rgba(10,14,18,.6);display:none;align-items:flex-start;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 20px) 12px 20px;overflow-y:auto;z-index:10}
+.modal.open{display:flex}
+.sheet{background:#fff;color:#111;border-radius:12px;width:min(520px,100%);padding:20px}
+.sheet h2{margin:0 0 6px;font-size:20px}
+.sheet p{margin:0 0 12px;font-size:15px;line-height:1.45;color:#333}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn{border:0;border-radius:8px;padding:11px 14px;font:600 15px Arial,sans-serif;cursor:pointer;background:#e7e9ec;color:#111}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.danger{background:#b3261e;color:#fff}
+.btn.green{background:var(--confirma);color:#fff}
+.pin{font:700 28px Arial,sans-serif;letter-spacing:.4em;text-align:center;width:100%;padding:10px;border:2px solid #bbb;border-radius:8px}
+.err{color:#b3261e;font-size:14px;min-height:18px;margin-top:6px}
+.switch{display:flex;align-items:center;gap:10px;font-size:15px;margin:10px 0;cursor:pointer}
+.switch input{width:20px;height:20px}
+.boletim{background:var(--paper);border:1px dashed #aaa;padding:16px;font-family:"Courier New",Courier,monospace;font-size:14px;color:#111;margin:10px 0}
+.boletim h3{text-align:center;margin:0 0 4px;font-size:16px}
+.boletim .c{text-align:center}
+.boletim hr{border:0;border-top:1px dashed #888;margin:10px 0}
+.cand{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center;margin:10px 0}
+.cand img{width:48px;height:48px;border-radius:50%;object-fit:cover;object-position:50% 20%;filter:grayscale(1)}
+.bar{height:10px;background:#e3e3e3;border-radius:5px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%}
+.line{display:flex;justify-content:space-between}
+.winner{text-align:center;font-weight:700;font-size:15px;margin-top:8px}
+.explain{font-family:Arial,sans-serif;font-size:13px;color:#444;line-height:1.45;margin-top:8px}
+@media (max-width:720px){
+  .urna{grid-template-columns:1fr;padding:12px;gap:12px}
+  .screen-wrap{padding:10px}
+  .brand{display:none}
+  .key{aspect-ratio:2.1/1}
+  .act{padding:14px 2px}.act.ok{padding:18px 2px}
+}
+@media (prefers-reduced-motion: reduce){
+  .digit.cur,.big{animation:none}
+  .progress.run{animation-duration:0s}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <strong id="ttl"></strong>
+  <button class="mesario-btn" id="openMesario">Mesário</button>
+</div>
+
+<main class="urna" aria-label="Urna eletrônica">
+  <div class="screen-wrap">
+    <div class="screen" id="screen" aria-live="polite"></div>
+  </div>
+  <div class="panel">
+    <div class="brand"><div class="seal">JE</div><div><b>JUSTIÇA ELEITORAL</b>Simulador educativo</div></div>
+    <div class="keypad" id="keypad">
+      <button class="key" data-d="1">1</button><button class="key" data-d="2">2</button><button class="key" data-d="3">3</button>
+      <button class="key" data-d="4">4</button><button class="key five" data-d="5">5</button><button class="key" data-d="6">6</button>
+      <button class="key" data-d="7">7</button><button class="key" data-d="8">8</button><button class="key" data-d="9">9</button>
+      <button class="key zero" data-d="0">0</button>
+    </div>
+    <div class="actions">
+      <button class="act b" id="kBranco">BRANCO</button>
+      <button class="act c" id="kCorrige">CORRIGE</button>
+      <button class="act ok" id="kConfirma">CONFIRMA</button>
+    </div>
+  </div>
+</main>
+
+<section class="help">
+  <p id="help1"></p>
+  <p>No teclado do computador: números para digitar, Enter confirma, Backspace corrige, B vota em branco.</p>
+</section>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+      // ============================================================
+      // ✏️ CONFIGURAÇÃO DA URNA — EDITE SOMENTE ESTA PARTE
+      //      Atente-se para não apagar as aspas, colchetes e vírgulas ao editar.
+      // EXEMPLO: ["12","Maria Silva","Deputada","https://exemplo.com/maria.jpg"]
+      // ============================================================
+
+  var DADOS=/*DADOS*/[
+    ["Deputado",[
+      ["00","Nome da candidata","Deputada","https://link.com/foto.jpg"],
+      ["00","Nome do candidato","Deputado","https://link.com/foto.jpg"],
+      ["00","Nome du candidate","Deputade","https://link.com/foto.jpg"]
+    ]],
+    ["Governador",[
+      ["00","Nome da candidata","Governadora","https://link.com/foto.jpg"],
+      ["00","Nome do candidato","Governador","https://link.com/foto.jpg"],
+      ["00","Nome du candidate","Governadore","https://link.com/foto.jpg"]
+    ]],
+    ["Presidente",[
+      ["00","Nome da candidata","Presidenta","https://link.com/foto.jpg"],
+      ["00","Nome do candidato","Presidente","https://link.com/foto.jpg"]
+    ]]
+  ];
+
+  // Opcional: Editar título que aparece no topo da urna e no boletim.
+
+  var TITULO="Eleição simulada";
+
+    // ============================================================
+    // ⛔ FIM DA ÁREA DE CONFIGURAÇÃO — NÃO EDITE O CÓDIGO ABAIXO DESTA LINHA
+    // ============================================================
+
+  var PAL=["#c98a12","#2e8b57","#6d4bb0","#2a7fc0","#e0337f","#d1502f","#1e8f9c","#8a6d3b"];
+  var SIL="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 40"><rect width="30" height="40" fill="#cfcfcf"/><circle cx="15" cy="15" r="7" fill="#8c8c8c"/><path d="M2 40c0-11 6-16 13-16s13 5 13 16z" fill="#8c8c8c"/></svg>');
+  var gi=0;
+  var CARGOS=DADOS.map(function(d,i){
+    var c={id:"c"+i,titulo:d[0],cands:{}};
+    d[1].forEach(function(t){ var f=t[3]||SIL; c.cands[t[0]]={nome:String(t[1]).toUpperCase(),cargo:t[2],foto:f,selo:f,cor:PAL[gi++%PAL.length]}; });
+    c.n=Object.keys(c.cands)[0].length;
+    return c;
+  });
+  var T=CARGOS.map(function(c){ return c.titulo.toLowerCase(); });
+  function lista(a){ return a.length<2 ? a.join("") : a.slice(0,-1).join(", ")+" e "+a[a.length-1]; }
+  var KEY="urna-v3-"+CARGOS.map(function(c){ return c.titulo+":"+Object.keys(c.cands).join(","); }).join("|");
+  document.getElementById("ttl").textContent=TITULO;
+  document.getElementById("help1").textContent=(CARGOS.length>1 ? "São "+CARGOS.length+" votos em sequência: primeiro "+T.join(", depois ")+"." : "É um voto: "+T[0]+".")+" Digite o número da candidatura, confira nome e foto na tela e aperte CONFIRMA. Errou? CORRIGE apaga e recomeça. Um número que não existe vira voto nulo.";
+
+  function zeros(){
+    var v = {};
+    CARGOS.forEach(function(c){ var o = { branco:0, nulo:0 }; Object.keys(c.cands).forEach(function(n){ o[n]=0; }); v[c.id]=o; });
+    return v;
+  }
+  function load(){
+    var fresh = { votos:zeros(), pin:null, liberacao:false, zeradaEm:new Date().toISOString() };
+    try{
+      var s = JSON.parse(localStorage.getItem(KEY) || "null");
+      if(s && s.votos){ var z = zeros(); CARGOS.forEach(function(c){ s.votos[c.id] = Object.assign({}, z[c.id], s.votos[c.id]||{}); }); return s; }
+    }catch(e){}
+    return fresh;
+  }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+  var state = load(); save();
+
+  var ctx = null;
+  function ac(){ if(!ctx){ try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return ctx; }
+  function tone(freq, start, dur, vol){
+    var c = ac(); if(!c) return;
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = "square"; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol||0.06, c.currentTime+start);
+    g.gain.setValueAtTime(0, c.currentTime+start+dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(c.currentTime+start); o.stop(c.currentTime+start+dur+0.02);
+  }
+  function beep(){ tone(1850, 0, 0.07); }
+  function somCargo(){ tone(1850, 0, 0.12, 0.07); tone(1850, 0.18, 0.12, 0.07); }
+  function somFim(){
+    var t = 0;
+    for(var i=0;i<5;i++){ tone(2100,t,0.075,0.07); tone(1600,t+0.08,0.075,0.07); t+=0.16; }
+    tone(2100,t,0.35,0.07);
+  }
+
+  var S = { cargo:0, digits:"", mode:"digitando", locked:false, pend:[] };
+  var screen = document.getElementById("screen");
+  function C(){ return CARGOS[S.cargo]; }
+
+  function footer(){
+    return '<div class="s-foot">Aperte a tecla:<br>CONFIRMA para CONFIRMAR este voto<br>CORRIGE para REINICIAR este voto</div>';
+  }
+  function boxes(){
+    var h = '<span class="digits">';
+    for(var i=0;i<C().n;i++){
+      var d = S.digits[i] || "";
+      h += '<span class="digit' + (i===S.digits.length && S.mode==="digitando" ? ' cur' : '') + '">' + d + '</span>';
+    }
+    return h + '</span>';
+  }
+
+  function render(){
+    var h = "", cargo = C();
+    if(S.mode === "aguardando"){
+      h = '<div class="s-center"><div class="wait">URNA AGUARDANDO<br>LIBERAÇÃO<small>Chame o mesário para liberar o próximo eleitor</small></div></div>';
+    } else if(S.mode === "fim"){
+      h = '<div class="s-center"><div class="fim">FIM</div></div><div class="progress run"></div>';
+    } else if(S.mode === "branco"){
+      h = '<div class="s-top">SEU VOTO PARA</div><div class="s-cargo">' + cargo.titulo + '</div>' +
+          '<div class="s-body"><div class="s-left"><div class="big">VOTO EM BRANCO</div></div></div>' + footer();
+    } else {
+      var full = S.digits.length === cargo.n;
+      var cand = full ? cargo.cands[S.digits] : null;
+      h = '<div class="s-top">SEU VOTO PARA</div><div class="s-cargo">' + (cand ? cand.cargo : cargo.titulo) + '</div><div class="s-body"><div class="s-left">';
+      h += '<div>Número:' + boxes() + '</div>';
+      if(full){
+        if(cand) h += '<div>Nome: <b>' + cand.nome + '</b></div>';
+        else h += '<div class="medium">NÚMERO ERRADO</div><div class="big">VOTO NULO</div>';
+      }
+      h += '</div>';
+      if(cand) h += '<div class="photo"><img src="' + cand.foto + '" alt="Foto de ' + cand.nome + '">' + cand.cargo + '</div>';
+      h += '</div>';
+      if(full) h += footer();
+    }
+    screen.innerHTML = h;
+  }
+
+  function press(el){ if(!el) return; el.classList.add("pressed"); setTimeout(function(){ el.classList.remove("pressed"); },110); }
+
+  function digit(d){
+    if(S.locked || S.mode !== "digitando" || S.digits.length >= C().n) return;
+    beep(); S.digits += d; render();
+  }
+  function corrige(){
+    if(S.locked || S.mode === "fim" || S.mode === "aguardando") return;
+    beep(); S.digits = ""; S.mode = "digitando"; render();
+  }
+  function branco(){
+    if(S.locked || S.mode !== "digitando" || S.digits.length > 0) return;
+    beep(); S.mode = "branco"; render();
+  }
+  function confirma(){
+    if(S.locked) return;
+    var tipo = null;
+    if(S.mode === "branco") tipo = "branco";
+    else if(S.mode === "digitando" && S.digits.length === C().n) tipo = C().cands[S.digits] ? S.digits : "nulo";
+    if(!tipo) return;
+    S.pend.push([C().id, tipo]);
+    S.digits = "";
+    if(S.cargo < CARGOS.length - 1){
+      S.locked = true; somCargo(); screen.innerHTML = "";
+      setTimeout(function(){ S.locked = false; S.cargo++; S.mode = "digitando"; render(); }, 450);
+      return;
+    }
+    S.pend.forEach(function(p){ state.votos[p[0]][p[1]] = (state.votos[p[0]][p[1]]||0) + 1; });
+    save(); S.pend = [];
+    S.locked = true; S.mode = "fim"; render(); somFim();
+    setTimeout(function(){
+      S.locked = false; S.cargo = 0;
+      S.mode = state.liberacao ? "aguardando" : "digitando";
+      render();
+    }, 2700);
+  }
+  function reiniciarEleitor(){ S.pend = []; S.cargo = 0; S.digits = ""; }
+
+  document.getElementById("keypad").addEventListener("click", function(e){
+    var b = e.target.closest("[data-d]"); if(b) digit(b.getAttribute("data-d"));
+  });
+  document.getElementById("kBranco").addEventListener("click", branco);
+  document.getElementById("kCorrige").addEventListener("click", corrige);
+  document.getElementById("kConfirma").addEventListener("click", confirma);
+
+  document.addEventListener("keydown", function(e){
+    if(modal.classList.contains("open")) return;
+    if(/^[0-9]$/.test(e.key)){ press(document.querySelector('[data-d="'+e.key+'"]')); digit(e.key); }
+    else if(e.key === "Enter"){ e.preventDefault(); press(document.getElementById("kConfirma")); confirma(); }
+    else if(e.key === "Backspace" || e.key === "Delete"){ e.preventDefault(); press(document.getElementById("kCorrige")); corrige(); }
+    else if(e.key === "b" || e.key === "B"){ press(document.getElementById("kBranco")); branco(); }
+  });
+
+  var modal = document.getElementById("modal"), sheet = document.getElementById("sheet");
+  function openModal(html){ sheet.innerHTML = html; modal.classList.add("open"); sheet.scrollTop = 0; modal.scrollTop = 0; var f = sheet.querySelector("input,button"); if(f) f.focus(); }
+  function closeModal(){ modal.classList.remove("open"); }
+  modal.addEventListener("click", function(e){ if(e.target === modal) closeModal(); });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape" && modal.classList.contains("open")) closeModal(); });
+
+  document.getElementById("openMesario").addEventListener("click", function(){
+    if(!state.pin) pinCreate(); else pinAsk();
+  });
+
+  function pinCreate(){
+    openModal('<h2 id="mTitle">Criar senha do mesário</h2><p>Escolha 4 números. A senha protege o resultado e o botão de zerar a urna.</p>' +
+      '<input class="pin" id="pin1" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="Nova senha">' +
+      '<div class="err" id="perr"></div><div class="row"><button class="btn primary" id="pOk">Salvar senha</button><button class="btn" id="pX">Cancelar</button></div>');
+    document.getElementById("pX").onclick = closeModal;
+    document.getElementById("pOk").onclick = function(){
+      var v = document.getElementById("pin1").value;
+      if(!/^\d{4}$/.test(v)){ document.getElementById("perr").textContent = "Use exatamente 4 números."; return; }
+      state.pin = v; save(); painel();
+    };
+    document.getElementById("pin1").onkeydown = function(e){ if(e.key==="Enter") document.getElementById("pOk").click(); };
+  }
+  function pinAsk(){
+    openModal('<h2 id="mTitle">Área do mesário</h2><p>Digite a senha de 4 números.</p>' +
+      '<input class="pin" id="pin2" type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="Senha">' +
+      '<div class="err" id="perr"></div><div class="row"><button class="btn primary" id="pOk">Entrar</button><button class="btn" id="pX">Cancelar</button></div>');
+    document.getElementById("pX").onclick = closeModal;
+    document.getElementById("pOk").onclick = function(){
+      if(document.getElementById("pin2").value === state.pin) painel();
+      else document.getElementById("perr").textContent = "Senha incorreta.";
+    };
+    document.getElementById("pin2").onkeydown = function(e){ if(e.key==="Enter") document.getElementById("pOk").click(); };
+  }
+
+  function soma(o){ var t=0; for(var k in o) t += o[k]; return t; }
+  function total(){ return Math.max.apply(null, CARGOS.map(function(c){ return soma(state.votos[c.id]); })); }
+
+  function painel(){
+    var t = total();
+    var meio = S.cargo > 0 && S.mode !== "fim";
+    openModal('<h2 id="mTitle">Área do mesário</h2>' +
+      '<p>' + (t===1 ? '1 pessoa votou' : t + ' pessoas votaram') + ' até agora.</p>' +
+      (meio ? '<p>Tem um eleitor no meio do voto (já confirmou o voto para ' + T[S.cargo-1] + '). Se ele desistiu, reinicie o voto dele; nada foi gravado ainda.</p><div class="row"><button class="btn" id="mRe">Reiniciar voto em andamento</button></div>' : '') +
+      (S.mode === "aguardando" ? '<div class="row"><button class="btn green" id="mLib">Liberar próximo eleitor</button></div>' : '') +
+      '<label class="switch"><input type="checkbox" id="mMode"' + (state.liberacao ? ' checked' : '') + '> Exigir liberação do mesário a cada voto</label>' +
+      '<div class="row"><button class="btn primary" id="mRes">Encerrar e ver boletim</button>' +
+      (t===0 ? '<button class="btn" id="mZer">Ver zerésima</button>' : '') + '</div>' +
+      '<div class="row"><button class="btn danger" id="mZero">Zerar urna</button><button class="btn" id="mPin">Trocar senha</button><button class="btn" id="mX">Voltar à votação</button></div>');
+    var re = document.getElementById("mRe");
+    if(re) re.onclick = function(){ reiniciarEleitor(); S.mode = "digitando"; render(); closeModal(); };
+    var lib = document.getElementById("mLib");
+    if(lib) lib.onclick = function(){ reiniciarEleitor(); S.mode = "digitando"; render(); closeModal(); };
+    document.getElementById("mMode").onchange = function(e){
+      state.liberacao = e.target.checked; save();
+      if(!state.liberacao && S.mode === "aguardando"){ S.mode = "digitando"; render(); }
+    };
+    document.getElementById("mRes").onclick = boletim;
+    var z = document.getElementById("mZer"); if(z) z.onclick = boletim;
+    document.getElementById("mZero").onclick = confirmZero;
+    document.getElementById("mPin").onclick = pinCreate;
+    document.getElementById("mX").onclick = closeModal;
+  }
+
+  function confirmZero(){
+    openModal('<h2 id="mTitle">Zerar a urna?</h2><p>Os votos de ' + total() + ' eleitores, para ' + lista(T) + ', serão apagados deste aparelho. Isso não pode ser desfeito.</p>' +
+      '<div class="row"><button class="btn danger" id="zOk">Apagar votos e zerar</button><button class="btn" id="zX">Cancelar</button></div>');
+    document.getElementById("zX").onclick = painel;
+    document.getElementById("zOk").onclick = function(){
+      state.votos = zeros(); state.zeradaEm = new Date().toISOString(); save();
+      reiniciarEleitor(); S.mode = state.liberacao ? "aguardando" : "digitando"; render(); boletim();
+    };
+  }
+
+  function fmt(d){ try{ return new Date(d).toLocaleString("pt-BR"); }catch(e){ return ""; } }
+  function pct(n, d){ return d ? (n*100/d).toFixed(1).replace(".", ",") + "%" : "0,0%"; }
+
+  function secao(cargo, zer){
+    var v = state.votos[cargo.id], nums = Object.keys(cargo.cands);
+    var validos = nums.reduce(function(a,n){ return a + v[n]; }, 0);
+    var ordem = nums.slice().sort(function(a,b){ return v[b]-v[a]; });
+    var h = '<div class="c"><b>' + cargo.titulo.toUpperCase() + '</b></div>';
+    ordem.forEach(function(n){
+      var c = cargo.cands[n];
+      h += '<div class="cand"><img src="' + c.selo + '" alt=""><div><div>' + n + ' ' + c.nome + '</div>' +
+           '<div class="bar"><i style="width:' + (validos ? v[n]*100/validos : 0) + '%;background:' + c.cor + '"></i></div></div>' +
+           '<div style="text-align:right"><b>' + v[n] + '</b><br>' + pct(v[n], validos) + '</div></div>';
+    });
+    h += '<div class="line"><span>Votos válidos</span><b>' + validos + '</b></div>';
+    h += '<div class="line"><span>Brancos</span><b>' + v.branco + '</b></div>';
+    h += '<div class="line"><span>Nulos</span><b>' + v.nulo + '</b></div>';
+    if(!zer && validos){
+      var a = ordem[0], b = ordem[1];
+      if(b === undefined){
+        h += '<div class="winner">ELEITO(A) NO 1º TURNO: ' + cargo.cands[a].nome + '</div>';
+      } else if(v[a] === v[b]){
+        var emp = ordem.filter(function(n){ return v[n] === v[a]; }).map(function(n){ return cargo.cands[n].nome; });
+        h += '<div class="winner">EMPATE: ' + emp.join(" E ") + '</div>';
+      } else if(v[a]*2 > validos){
+        h += '<div class="winner">ELEITO(A) NO 1º TURNO: ' + cargo.cands[a].nome + '</div>';
+      } else {
+        h += '<div class="winner">2º TURNO: ' + cargo.cands[a].nome + ' X ' + cargo.cands[b].nome + '</div>';
+      }
+    } else if(!zer){
+      h += '<div class="winner">SEM VOTOS VÁLIDOS</div>';
+    }
+    return h;
+  }
+
+  function boletim(){
+    var t = total(), zer = t === 0;
+    var h = '<h2 id="mTitle">' + (zer ? 'Zerésima' : 'Boletim de urna') + '</h2>';
+    h += '<div class="boletim"><h3>' + (zer ? 'ZERÉSIMA' : 'BOLETIM DE URNA') + '</h3><div class="c">' + TITULO.toUpperCase() + '</div>';
+    h += '<div class="c">' + fmt(new Date()) + '</div><hr>';
+    CARGOS.forEach(function(c){ h += secao(c, zer) + '<hr>'; });
+    h += '<div class="line"><span>Comparecimento</span><b>' + t + '</b></div>';
+    if(zer) h += '<div class="winner">Nenhum voto registrado. Urna pronta.</div>';
+    h += '</div>';
+    h += zer
+      ? '<p class="explain">Na eleição de verdade, a zerésima é impressa antes do primeiro voto e prova, na frente dos fiscais, que a urna começa sem nenhum voto guardado.</p>'
+      : '<p class="explain">Os percentuais são calculados só sobre os votos válidos, como na apuração oficial: brancos e nulos são contados, mas não vão para nenhum candidato. Quem passa de 50% dos válidos vence no 1º turno; se ninguém passa, os dois mais votados disputam o 2º turno. O voto é secreto: a urna guarda só a contagem, nunca quem votou em quem.</p>';
+    h += '<div class="row"><button class="btn primary" id="bBack">Voltar ao painel</button><button class="btn" id="bX">Fechar</button></div>';
+    openModal(h);
+    document.getElementById("bBack").onclick = painel;
+    document.getElementById("bX").onclick = closeModal;
+  }
+
+  S.mode = state.liberacao ? "aguardando" : "digitando";
+  render();
+})();
+</script>
+
+</body>
+</html>
